@@ -11,31 +11,12 @@
 </head>
 <body class="bg-gray-50 min-h-screen">
 
-    <div class="max-w-7xl mx-auto px-4 py-8">
+    <div class="max-w-7xl mx-auto px-4 py-8 relative">
         <div class="flex justify-between items-center mb-8">
             <h1 class="text-3xl font-bold text-gray-800">ניהול לידים <span class="text-blue-600">Pro</span></h1>
-            <button class="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-blue-700 transition">
-                <i class="fas fa-plus ml-2"></i>ליד חדש
+            <button id="openModalBtn" class="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-blue-700 transition flex items-center">
+                <i class="fas fa-plus ml-2"></i> ליד חדש
             </button>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-            <div class="bg-white p-6 rounded-xl shadow-sm border-r-4 border-blue-500">
-                <p class="text-gray-500 text-sm">סה"כ לידים</p>
-                <p class="text-2xl font-bold">{{ stats.total }}</p>
-            </div>
-            <div class="bg-white p-6 rounded-xl shadow-sm border-r-4 border-green-500">
-                <p class="text-gray-500 text-sm">חדשים</p>
-                <p class="text-2xl font-bold text-green-600">{{ stats.new }}</p>
-            </div>
-            <div class="bg-white p-6 rounded-xl shadow-sm border-r-4 border-yellow-500">
-                <p class="text-gray-500 text-sm">בטיפול</p>
-                <p class="text-2xl font-bold text-yellow-600">{{ stats.in_progress }}</p>
-            </div>
-            <div class="bg-white p-6 rounded-xl shadow-sm border-r-4 border-purple-500">
-                <p class="text-gray-500 text-sm">יחס המרה</p>
-                <p class="text-2xl font-bold">0%</p>
-            </div>
         </div>
 
         <div class="bg-white rounded-xl shadow-md overflow-hidden">
@@ -46,7 +27,7 @@
                         <th class="p-4 border-b">טלפון</th>
                         <th class="p-4 border-b">מקור</th>
                         <th class="p-4 border-b">סטטוס</th>
-                        <th class="p-4 border-b">תאריך יצירה</th>
+                        <th class="p-4 border-b">תאריך</th>
                         <th class="p-4 border-b">פעולות</th>
                     </tr>
                 </thead>
@@ -59,21 +40,18 @@
                             <span class="px-2 py-1 bg-gray-200 text-xs rounded-md">{{ lead.source }}</span>
                         </td>
                         <td class="p-4">
-                            <span class="px-3 py-1 text-xs font-bold rounded-full 
-                                {% if lead.status == 'חדש' %} bg-blue-100 text-blue-700 
-                                {% elif lead.status == 'בטיפול' %} bg-yellow-100 text-yellow-700
-                                {% else %} bg-green-100 text-green-700 {% endif %}">
+                            <span class="px-3 py-1 text-xs font-bold rounded-full bg-blue-100 text-blue-700">
                                 {{ lead.status }}
                             </span>
                         </td>
-                        <td class="p-4 text-sm text-gray-500">{{ lead.created_at }}</td>
+                        <td class="p-4 text-sm text-gray-500">-</td>
                         <td class="p-4 flex gap-2">
-                            <a href="https://wa.me/972{{ lead.phone[1:] }}?text=היי {{ lead.name }}, זה אבי" target="_blank" 
-                               class="text-green-500 hover:text-green-600 text-xl">
+                            <a href="https://wa.me/972{{ lead.phone[1:] }}?text=היי {{ lead.name }}" target="_blank" class="text-green-500 hover:text-green-600 text-xl">
                                 <i class="fab fa-whatsapp"></i>
                             </a>
                             <a href="tel:{{ lead.phone }}" class="text-blue-500 hover:text-blue-600 text-xl">
-                                <i class="fas fa-phone"></i>
+                                <i class="fas fa-phone">
+                                </i>
                             </a>
                         </td>
                     </tr>
@@ -82,6 +60,88 @@
             </table>
         </div>
     </div>
+
+    <div id="leadModal" class="fixed inset-0 bg-gray-900 bg-opacity-50 flex justify-center items-center z-50 hidden opacity-0 transition-opacity duration-300">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg p-8 transform scale-90 transition-transform duration-300">
+            
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold flex items-center">
+                    <i class="fas fa-plus-circle text-blue-600 ml-3"></i>
+                    הקמת ליד פרטי חדש
+                </h2>
+                <button id="closeModalBtn" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+            </div>
+
+            <form action="/add_lead_manual" method="POST" class="space-y-4">
+                
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">שם מלא *</label>
+                    <input type="text" name="name" required class="w-full border p-3 rounded-lg focus:ring-2 focus:ring-blue-200 outline-none" placeholder="ישראל ישראלי">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">טלפון *</label>
+                    <input type="tel" name="phone" required class="w-full border p-3 rounded-lg focus:ring-2 focus:ring-blue-200 outline-none" placeholder="0500000000">
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">גיל</label>
+                        <input type="number" name="age" class="w-full border p-3 rounded-lg focus:ring-2 focus:ring-blue-200 outline-none" placeholder="35">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">מוצר/שירות</label>
+                        <input type="text" name="product" class="w-full border p-3 rounded-lg focus:ring-2 focus:ring-blue-200 outline-none" placeholder="לא ידוע">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">מקור ליד</label>
+                    <input type="text" name="source" class="w-full border p-3 rounded-lg focus:ring-2 focus:ring-blue-200 outline-none" placeholder="המלצה, פייסבוק, וכו'">
+                </div>
+
+                <div class="flex justify-end gap-3 pt-6">
+                    <button type="button" id="cancelBtn" class="px-6 py-2 border rounded-lg hover:bg-gray-100 transition">ביטול</button>
+                    <button type="submit" class="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 transition font-bold">שמור ליד פרטי</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const modal = document.getElementById('leadModal');
+        const modalContent = modal.querySelector('.bg-white');
+        const openModalBtn = document.getElementById('openModalBtn');
+        const closeModalBtn = document.getElementById('closeModalBtn');
+        const cancelBtn = document.getElementById('cancelBtn');
+
+        // פונקציה לפתיחת המודל עם אנימציה
+        function openModal() {
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modal.classList.remove('opacity-0');
+                modalContent.classList.remove('scale-90');
+            }, 10);
+        }
+
+        // פונקציה לסגירת המודל
+        function closeModal() {
+            modal.classList.add('opacity-0');
+            modalContent.classList.add('scale-90');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 300); // מחכה לסיום האנימציה
+        }
+
+        openModalBtn.addEventListener('click', openModal);
+        closeModalBtn.addEventListener('click', closeModal);
+        cancelBtn.addEventListener('click', closeModal);
+
+        // סגירה בלחיצה על הרקע השקוף
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) closeModal();
+        });
+    </script>
 
 </body>
 </html>
