@@ -11,11 +11,18 @@ def get_db_connection():
 
 def init_db():
     conn = get_db_connection()
-    # יצירת הטבלה מחדש עם כל השדות הדרושים
+    # יצירת הטבלה אם לא קיימת
     conn.execute('''CREATE TABLE IF NOT EXISTS leads 
                  (id INTEGER PRIMARY KEY AUTOINCREMENT, 
                   name TEXT, phone TEXT, status TEXT DEFAULT 'חדש', 
-                  source TEXT DEFAULT 'מנואל', product TEXT DEFAULT '-')''')
+                  source TEXT DEFAULT 'מנואל', notes TEXT DEFAULT '')''')
+    
+    # בדיקה אם עמודת notes קיימת (למקרה שמעדכנים בסיס נתונים קיים)
+    try:
+        conn.execute('SELECT notes FROM leads LIMIT 1')
+    except sqlite3.OperationalError:
+        conn.execute('ALTER TABLE leads ADD COLUMN notes TEXT DEFAULT ""')
+        
     conn.commit()
     conn.close()
 
@@ -23,39 +30,57 @@ init_db()
 
 @app.route('/')
 def index():
-    try:
-        conn = get_db_connection()
-        leads_raw = conn.execute('SELECT * FROM leads ORDER BY id DESC').fetchall()
-        leads = [dict(ix) for ix in leads_raw]
-        
-        total = len(leads)
-        new = len([l for l in leads if l['status'] == 'חדש'])
-        meetings = len([l for l in leads if l['status'] == 'נקבעה פגישה'])
-        closed = len([l for l in leads if l['status'] == 'נסגר'])
-        
-        # חישוב אחוז המרה בטוח
-        conv_rate = round((closed / total * 100), 1) if total > 0 else 0
-        
-        stats = {'total': total, 'new': new, 'meetings': meetings, 'closed': closed, 'conv_rate': conv_rate}
-        conn.close()
-        return render_template('index.html', leads=leads, stats=stats)
-    except Exception as e:
-        return f"שגיאה בטעינת המערכת: {e}"
-
-@app.route('/update_status', methods=['POST'])
-def update_status():
-    data = request.get_json()
+    search_query = request.args.get('search', '')
     conn = get_db_connection()
-    conn.execute('UPDATE leads SET status = ? WHERE id = ?', (data.get('status'), data.get('id')))
+    
+    if search_query:
+        query = "SELECT * FROM leads WHERE name LIKE ? OR phone LIKE ? OR source LIKE ? ORDER BY id DESC"
+        leads_raw = conn.execute(query, (f'%{search_query}%', f'%{search_query}%', f'%{search_query}%')).fetchall()
+    else:
+        leads_raw = conn.execute('SELECT * FROM leads ORDER BY id DESC').fetchall()
+        
+    leads = [dict(ix) for ix in leads_raw]
+    
+    # סטטיסטיקות
+    total = len(leads)
+    closed = len([l for l in leads if l['status'] == 'נסגר'])
+    conv_rate = round((closed / total * 100), 1) if total > 0 else 0
+    
+    stats = {
+        'total': total,
+        'new': len([l for l in leads if l['status'] == 'חדש']),
+        'meetings': len([l for l in leads if l['status'] == 'נקבעה פגישה']),
+        'closed': closed,
+        'conv_rate': conv_rate
+    }
+    conn.close()
+    return render_template('index.html', leads=leads, stats=stats, search_query=search_query)
+
+@app.route('/update_lead', methods=['POST'])
+def update_lead():
+    data = request.get_json()
+    lead_id = data.get('id')
+    field = data.get('field') # status או notes
+    value = data.get('value')
+    
+    conn = get_db_connection()
+    if field == 'status':
+        conn.execute('UPDATE leads SET status = ? WHERE id = ?', (value, lead_id))
+    elif field == 'notes':
+        conn.execute('UPDATE leads SET notes = ? WHERE id = ?', (value, lead_id))
+    
     conn.commit()
     conn.close()
     return jsonify({"status": "success"})
 
 @app.route('/add_lead_manual', methods=['POST'])
 def add_lead_manual():
-    name, phone, source = request.form.get('name'), request.form.get('phone'), request.form.get('source', 'מנואל')
+    name = request.form.get('name')
+    phone = request.form.get('phone')
+    source = request.form.get('source', 'מנואל')
+    notes = request.form.get('notes', '')
     conn = get_db_connection()
-    conn.execute('INSERT INTO leads (name, phone, source) VALUES (?, ?, ?)', (name, phone, source))
+    conn.execute('INSERT INTO leads (name, phone, source, notes) VALUES (?, ?, ?, ?)', (name, phone, source, notes))
     conn.commit()
     conn.close()
     return redirect('/')
@@ -63,9 +88,11 @@ def add_lead_manual():
 @app.route('/webhook', methods=['POST'])
 def receive_lead():
     data = request.get_json()
+    # תמיכה בשדה 'source' מה-webhook (למשל מ-Make)
+    source = data.get('source', 'קמפיין אוטומטי')
     conn = get_db_connection()
     conn.execute('INSERT INTO leads (name, phone, source) VALUES (?, ?, ?)',
-                 (data.get('name'), data.get('phone'), data.get('source', 'אוטומטי')))
+                 (data.get('name'), data.get('phone'), source))
     conn.commit()
     conn.close()
     return "OK", 200
