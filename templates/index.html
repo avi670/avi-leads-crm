@@ -1,160 +1,28 @@
-<!DOCTYPE html>
-<html lang="he" dir="rtl">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LeadPro CRM - Dashboard</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;800&display=swap" rel="stylesheet">
-    <style>body { font-family: 'Assistant', sans-serif; }</style>
-</head>
-<body class="bg-slate-50 min-h-screen pb-20">
-
-    <div class="max-w-7xl mx-auto px-4 py-8">
-        <div class="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
-            <div>
-                <h1 class="text-4xl font-black text-slate-800">Lead<span class="text-blue-600">Pro</span></h1>
-                <p class="text-slate-500 font-medium">ניהול קמפיינים ולידים בזמן אמת</p>
-            </div>
-            
-            <div class="flex w-full md:w-auto gap-2">
-                <form action="/" method="GET" class="relative flex-1 md:w-80">
-                    <input type="text" name="search" value="{{ search_query }}" placeholder="חפש שם, טלפון או קמפיין..." 
-                           class="w-full pl-10 pr-4 py-3 rounded-2xl border-none shadow-sm focus:ring-2 focus:ring-blue-500 outline-none">
-                    <i class="fas fa-search absolute left-3 top-3.5 text-slate-400"></i>
-                </form>
-                <button onclick="openModal()" class="bg-blue-600 text-white px-6 py-3 rounded-2xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-200 transition">
-                    + ליד חדש
-                </button>
-            </div>
-        </div>
-
-        <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
-            <div class="bg-white p-5 rounded-3xl shadow-sm border border-slate-100">
-                <p class="text-slate-400 text-xs font-bold uppercase tracking-widest">סה"כ</p>
-                <p class="text-3xl font-black text-slate-800">{{ stats.total }}</p>
-            </div>
-            <div class="bg-white p-5 rounded-3xl shadow-sm border border-slate-100">
-                <p class="text-green-500 text-xs font-bold uppercase tracking-widest">חדשים</p>
-                <p class="text-3xl font-black text-green-500">{{ stats.new }}</p>
-            </div>
-            <div class="bg-white p-5 rounded-3xl shadow-sm border border-slate-100">
-                <p class="text-orange-500 text-xs font-bold uppercase tracking-widest">פגישות</p>
-                <p class="text-3xl font-black text-orange-500">{{ stats.meetings }}</p>
-            </div>
-            <div class="bg-white p-5 rounded-3xl shadow-sm border border-slate-100">
-                <p class="text-purple-600 text-xs font-bold uppercase tracking-widest">סגירות</p>
-                <p class="text-3xl font-black text-purple-600">{{ stats.closed }}</p>
-            </div>
-            <div class="bg-blue-600 p-5 rounded-3xl shadow-sm text-white">
-                <p class="text-blue-100 text-xs font-bold uppercase tracking-widest">המרה</p>
-                <p class="text-3xl font-black">{{ stats.conv_rate }}%</p>
-            </div>
-        </div>
-
-        <div class="bg-white rounded-[2rem] shadow-xl shadow-slate-200/50 border border-slate-100 overflow-hidden">
-            <div class="overflow-x-auto">
-                <table class="w-full text-right">
-                    <thead class="bg-slate-50/50 text-slate-400 text-[11px] font-black uppercase tracking-tighter border-b">
-                        <tr>
-                            <th class="p-6">לקוח</th>
-                            <th class="p-6">מקור קמפיין</th>
-                            <th class="p-6">הערות</th>
-                            <th class="p-6 text-center">סטטוס</th>
-                            <th class="p-6 text-center">פעולות</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-50">
-                        {% for lead in leads %}
-                        <tr class="hover:bg-slate-50/80 transition-colors group">
-                            <td class="p-6">
-                                <p class="font-bold text-slate-800">{{ lead.name }}</p>
-                                <p class="text-xs text-slate-400 font-medium">{{ lead.phone }}</p>
-                            </td>
-                            <td class="p-6">
-                                <span class="bg-blue-50 text-blue-600 px-3 py-1.5 rounded-xl text-[11px] font-bold border border-blue-100">
-                                    <i class="fas fa-bullhorn ml-1 text-[10px]"></i> {{ lead.source }}
-                                </span>
-                            </td>
-                            <td class="p-6">
-                                <input type="text" value="{{ lead.notes }}" 
-                                       onblur="updateLead('{{ lead.id }}', 'notes', this.value)"
-                                       placeholder="הוסף הערה..."
-                                       class="bg-transparent border-none text-sm text-slate-600 w-full focus:ring-0 placeholder:text-slate-300 italic">
-                            </td>
-                            <td class="p-6 text-center">
-                                <select onchange="updateLead('{{ lead.id }}', 'status', this.value)" 
-                                        class="text-[11px] font-black rounded-full px-4 py-2 outline-none cursor-pointer border-none shadow-sm
-                                        {% if lead.status == 'חדש' %} bg-green-500 text-white
-                                        {% elif lead.status == 'נקבעה פגישה' %} bg-orange-500 text-white
-                                        {% elif lead.status == 'נסגר' %} bg-purple-600 text-white
-                                        {% else %} bg-slate-200 text-slate-600 {% endif %}">
-                                    <option value="חדש" {% if lead.status == 'חדש' %}selected{% endif %}>חדש</option>
-                                    <option value="אין מענה" {% if lead.status == 'אין מענה' %}selected{% endif %}>אין מענה</option>
-                                    <option value="לא מעוניין" {% if lead.status == 'לא מעוניין' %}selected{% endif %}>לא מעוניין</option>
-                                    <option value="נקבעה פגישה" {% if lead.status == 'נקבעה פגישה' %}selected{% endif %}>נקבעה פגישה</option>
-                                    <option value="נסגר" {% if lead.status == 'נסגר' %}selected{% endif %}>נסגר</option>
-                                    <option value="לא נסגר" {% if lead.status == 'לא נסגר' %}selected{% endif %}>לא נסגר</option>
-                                </select>
-                            </td>
-                            <td class="p-6">
-                                <div class="flex justify-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <a href="https://wa.me/972{{ lead.phone[1:] }}?text=היי {{ lead.name }}" target="_blank" class="w-10 h-10 rounded-full bg-green-50 text-green-500 flex items-center justify-center hover:bg-green-500 hover:text-white transition-all shadow-sm">
-                                        <i class="fab fa-whatsapp"></i>
-                                    </a>
-                                    <a href="tel:{{ lead.phone }}" class="w-10 h-10 rounded-full bg-blue-50 text-blue-500 flex items-center justify-center hover:bg-blue-500 hover:text-white transition-all shadow-sm">
-                                        <i class="fas fa-phone"></i>
-                                    </a>
-                                </div>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
+<div class="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+    <div>
+        <h1 class="text-4xl font-black text-slate-800">Lead<span class="text-blue-600">Pro</span></h1>
+        <p class="text-slate-500 font-medium">ניהול קמפיינים ולידים בזמן אמת</p>
     </div>
-
-    <div id="leadModal" class="fixed inset-0 bg-slate-900/60 hidden backdrop-blur-sm flex justify-center items-center z-50">
-        <div class="bg-white rounded-[2.5rem] p-10 w-full max-w-md shadow-2xl mx-4 transform transition-all border border-slate-100">
-            <h2 class="text-3xl font-black mb-2 text-slate-800 tracking-tighter">ליד חדש</h2>
-            <p class="text-slate-400 mb-8 font-medium italic">הזן פרטים כדי להתחיל את הקמפיין</p>
-            
-            <form action="/add_lead_manual" method="POST" class="space-y-4">
-                <div class="space-y-1">
-                    <label class="text-[11px] font-black uppercase text-slate-400 mr-2">שם מלא</label>
-                    <input type="text" name="name" required class="w-full p-4 bg-slate-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-bold">
-                </div>
-                <div class="space-y-1">
-                    <label class="text-[11px] font-black uppercase text-slate-400 mr-2">מספר טלפון</label>
-                    <input type="tel" name="phone" required class="w-full p-4 bg-slate-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-bold">
-                </div>
-                <div class="space-y-1">
-                    <label class="text-[11px] font-black uppercase text-slate-400 mr-2">שם הקמפיין / מקור</label>
-                    <input type="text" name="source" placeholder="למשל: Facebook Ads_Dec" class="w-full p-4 bg-slate-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-bold">
-                </div>
-                
-                <div class="flex gap-3 pt-6">
-                    <button type="submit" class="flex-1 bg-blue-600 text-white p-4 rounded-2xl font-black shadow-lg shadow-blue-200 hover:bg-blue-700 transition">שמור ליד</button>
-                    <button type="button" onclick="closeModal()" class="px-8 font-bold text-slate-400 hover:text-slate-600">סגור</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <script>
-        function openModal() { document.getElementById('leadModal').classList.remove('hidden'); }
-        function closeModal() { document.getElementById('leadModal').classList.add('hidden'); }
+    
+    <div class="flex w-full md:w-auto gap-2">
+        <form action="/" method="GET" class="flex gap-2 flex-1 md:w-96">
+            <div class="relative flex-1">
+                <input type="text" name="search" value="{{ search_query }}" placeholder="חפש שם, טלפון או קמפיין..." 
+                       class="w-full pl-10 pr-4 py-3 rounded-2xl border-none shadow-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                <i class="fas fa-search absolute left-3 top-3.5 text-slate-400"></i>
+            </div>
+            <button type="submit" class="bg-slate-800 text-white px-4 py-3 rounded-2xl font-bold hover:bg-slate-700 transition">
+                חפש
+            </button>
+            {% if search_query %}
+            <a href="/" class="bg-slate-200 text-slate-600 px-4 py-3 rounded-2xl font-bold hover:bg-slate-300 transition">
+                נקה
+            </a>
+            {% endif %}
+        </form>
         
-        async function updateLead(id, field, value) {
-            await fetch('/update_lead', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({id: id, field: field, value: value})
-            });
-            if (field === 'status') location.reload(); 
-        }
-    </script>
-</body>
-</html>
+        <button onclick="openModal()" class="bg-blue-600 text-white px-6 py-3 rounded-2xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-200 transition whitespace-nowrap">
+            + ליד חדש
+        </button>
+    </div>
+</div>
