@@ -1,86 +1,84 @@
 from flask import Flask, render_template, request, jsonify, redirect
 import sqlite3
-import requests
 import os
 
 app = Flask(__name__)
 
-# פונקציה ליצירת חיבור לבסיס הנתונים (מחזירה אובייקט עם שמות עמודות)
 def get_db_connection():
     conn = sqlite3.connect('leads.db')
-    conn.row_factory = sqlite3.Row  # קריטי כדי לקרוא לפי שם (כמו lead['name'])
+    conn.row_factory = sqlite3.Row
     return conn
 
-# פונקציה ליצירת בסיס הנתונים - חייבת לרוץ מיד כשהשרת עולה
 def init_db():
     conn = get_db_connection()
-    # יצירת טבלה מורחבת (שמנוע ה-CRM צריך)
     conn.execute('''CREATE TABLE IF NOT EXISTS leads 
-                     (id INTEGER PRIMARY KEY AUTOINCREMENT, 
-                      name TEXT, 
-                      phone TEXT, 
-                      status TEXT DEFAULT 'חדש', 
-                      source TEXT DEFAULT 'מנואל',
-                      product TEXT DEFAULT '-')''')
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT, 
+                  name TEXT, phone TEXT, status TEXT DEFAULT 'חדש', 
+                  source TEXT DEFAULT 'מנואל', product TEXT DEFAULT '-')''')
     conn.commit()
     conn.close()
 
-# הפעלת בסיס הנתונים מיד עם עליית השרת
 init_db()
 
 @app.route('/')
 def index():
-    try:
-        conn = get_db_connection()
-        # משיכת כל הלידים, המסודרים מהחדש לישן
-        leads_raw = conn.execute('SELECT * FROM leads ORDER BY id DESC').fetchall()
-        # המרת התוצאה הגולמית לרשימת מילונים של פייתון
-        leads = [dict(ix) for ix in leads_raw]
-        conn.close()
-        return render_template('index.html', leads=leads)
-    except Exception as e:
-        return f"שגיאה חמורה בטעינת האתר: {e}"
+    conn = get_db_connection()
+    leads_raw = conn.execute('SELECT * FROM leads ORDER BY id DESC').fetchall()
+    leads = [dict(ix) for ix in leads_raw]
+    
+    # חישוב סטטיסטיקה
+    total = len(leads)
+    new = len([l for l in leads if l['status'] == 'חדש'])
+    meetings = len([l for l in leads if l['status'] == 'נקבעה פגישה'])
+    closed = len([l for l in leads if l['status'] == 'נסגר'])
+    
+    # חישוב אחוז המרה (נסגר מתוך סה"כ)
+    conv_rate = round((closed / total * 100), 1) if total > 0 else 0
+    
+    stats = {
+        'total': total,
+        'new': new,
+        'meetings': meetings,
+        'closed': closed,
+        'conv_rate': conv_rate
+    }
+    
+    conn.close()
+    return render_template('index.html', leads=leads, stats=stats)
 
-# כתובת חדשה לקבלת לידים דרך הטופס באתר (עבור הכפתור הכחול)
+@app.route('/update_status', methods=['POST'])
+def update_status():
+    data = request.get_json()
+    lead_id = data.get('id')
+    new_status = data.get('status')
+    
+    conn = get_db_connection()
+    conn.execute('UPDATE leads SET status = ? WHERE id = ?', (new_status, lead_id))
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "success"})
+
 @app.route('/add_lead_manual', methods=['POST'])
 def add_lead_manual():
-    try:
-        # קבלת המידע מהטופס הרגיל ב-HTML
-        name = request.form.get('name')
-        phone = request.form.get('phone')
-        source = request.form.get('source', 'מנואל')
-        product = request.form.get('product', '-')
+    name = request.form.get('name')
+    phone = request.form.get('phone')
+    source = request.form.get('source', 'מנואל')
+    conn = get_db_connection()
+    conn.execute('INSERT INTO leads (name, phone, source) VALUES (?, ?, ?)', (name, phone, source))
+    conn.commit()
+    conn.close()
+    return redirect('/')
 
-        if not name or not phone:
-            return "שגיאה: חייבים שם וטלפון", 400
-
-        conn = get_db_connection()
-        conn.execute('INSERT INTO leads (name, phone, source, product) VALUES (?, ?, ?, ?)',
-                     (name, phone, source, product))
-        conn.commit()
-        conn.close()
-        # אחרי ההוספה, החזרת המשתמש לדף הבית
-        return redirect('/')
-    except Exception as e:
-        return f"שגיאה בהוספת הליד: {e}", 500
-
-# כתובת לקבלת לידים אוטומטיים (מ-Make/Webhooks)
 @app.route('/webhook', methods=['POST'])
 def receive_lead():
-    try:
-        # כאן אנחנו מצפים ל-JSON
-        data = request.get_json()
-        if not data: return "No data", 400
-        conn = get_db_connection()
-        conn.execute('INSERT INTO leads (name, phone, source, product) VALUES (?, ?, ?, ?)',
-                     (data.get('name'), data.get('phone'), data.get('source', 'אוטומטי'), data.get('product', '-')))
-        conn.commit()
-        conn.close()
-        return "OK", 200
-    except Exception as e:
-        return f"Webhook Error: {e}", 500
+    data = request.get_json()
+    conn = get_db_connection()
+    conn.execute('INSERT INTO leads (name, phone, source) VALUES (?, ?, ?)',
+                 (data.get('name'), data.get('phone'), data.get('source', 'אוטומטי')))
+    conn.commit()
+    conn.close()
+    return "OK", 200
 
 if __name__ == '__main__':
-    # Render צריך את הפורט הזה
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
