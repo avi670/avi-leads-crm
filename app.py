@@ -10,7 +10,7 @@ ID_INSTANCE = '7103XXXXXX'
 API_TOKEN_INSTANCE = 'your_token_here'
 
 # יצירת בסיס הנתונים (הטבלה של הלידים)
-def init_db()
+def init_db():
     conn = sqlite3.connect('leads.db')
     cursor = conn.cursor()
     cursor.execute('''CREATE TABLE IF NOT EXISTS leads 
@@ -19,7 +19,7 @@ def init_db()
     conn.close()
 
 @app.route('')
-def index()
+def index():
     conn = sqlite3.connect('leads.db')
     cursor = conn.cursor()
     cursor.execute('SELECT  FROM leads ORDER BY id DESC')
@@ -28,7 +28,7 @@ def index()
     return render_template('index.html', leads=leads)
 
 @app.route('webhook', methods=['POST'])
-def receive_lead()
+def receive_lead():
     data = request.json
     conn = sqlite3.connect('leads.db')
     cursor = conn.cursor()
