@@ -11,6 +11,7 @@ def get_db_connection():
 
 def init_db():
     conn = get_db_connection()
+    # יצירת הטבלה מחדש עם כל השדות הדרושים
     conn.execute('''CREATE TABLE IF NOT EXISTS leads 
                  (id INTEGER PRIMARY KEY AUTOINCREMENT, 
                   name TEXT, phone TEXT, status TEXT DEFAULT 'חדש', 
@@ -22,47 +23,37 @@ init_db()
 
 @app.route('/')
 def index():
-    conn = get_db_connection()
-    leads_raw = conn.execute('SELECT * FROM leads ORDER BY id DESC').fetchall()
-    leads = [dict(ix) for ix in leads_raw]
-    
-    # חישוב סטטיסטיקה
-    total = len(leads)
-    new = len([l for l in leads if l['status'] == 'חדש'])
-    meetings = len([l for l in leads if l['status'] == 'נקבעה פגישה'])
-    closed = len([l for l in leads if l['status'] == 'נסגר'])
-    
-    # חישוב אחוז המרה (נסגר מתוך סה"כ)
-    conv_rate = round((closed / total * 100), 1) if total > 0 else 0
-    
-    stats = {
-        'total': total,
-        'new': new,
-        'meetings': meetings,
-        'closed': closed,
-        'conv_rate': conv_rate
-    }
-    
-    conn.close()
-    return render_template('index.html', leads=leads, stats=stats)
+    try:
+        conn = get_db_connection()
+        leads_raw = conn.execute('SELECT * FROM leads ORDER BY id DESC').fetchall()
+        leads = [dict(ix) for ix in leads_raw]
+        
+        total = len(leads)
+        new = len([l for l in leads if l['status'] == 'חדש'])
+        meetings = len([l for l in leads if l['status'] == 'נקבעה פגישה'])
+        closed = len([l for l in leads if l['status'] == 'נסגר'])
+        
+        # חישוב אחוז המרה בטוח
+        conv_rate = round((closed / total * 100), 1) if total > 0 else 0
+        
+        stats = {'total': total, 'new': new, 'meetings': meetings, 'closed': closed, 'conv_rate': conv_rate}
+        conn.close()
+        return render_template('index.html', leads=leads, stats=stats)
+    except Exception as e:
+        return f"שגיאה בטעינת המערכת: {e}"
 
 @app.route('/update_status', methods=['POST'])
 def update_status():
     data = request.get_json()
-    lead_id = data.get('id')
-    new_status = data.get('status')
-    
     conn = get_db_connection()
-    conn.execute('UPDATE leads SET status = ? WHERE id = ?', (new_status, lead_id))
+    conn.execute('UPDATE leads SET status = ? WHERE id = ?', (data.get('status'), data.get('id')))
     conn.commit()
     conn.close()
     return jsonify({"status": "success"})
 
 @app.route('/add_lead_manual', methods=['POST'])
 def add_lead_manual():
-    name = request.form.get('name')
-    phone = request.form.get('phone')
-    source = request.form.get('source', 'מנואל')
+    name, phone, source = request.form.get('name'), request.form.get('phone'), request.form.get('source', 'מנואל')
     conn = get_db_connection()
     conn.execute('INSERT INTO leads (name, phone, source) VALUES (?, ?, ?)', (name, phone, source))
     conn.commit()
