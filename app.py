@@ -1,9 +1,10 @@
 from flask import Flask, render_template, request, jsonify
 import sqlite3
+import os
 
 app = Flask(__name__)
 
-# פונקציה ליצירת בסיס הנתונים
+# פונקציה ליצירת בסיס הנתונים - הפעם היא תרוץ תמיד
 def init_db():
     conn = sqlite3.connect('leads.db')
     cursor = conn.cursor()
@@ -12,7 +13,9 @@ def init_db():
     conn.commit()
     conn.close()
 
-# דף הבית - מציג את הטבלה
+# קריאה לפונקציה מיד כשהקוד עולה
+init_db()
+
 @app.route('/')
 def index():
     try:
@@ -23,21 +26,25 @@ def index():
         conn.close()
         return render_template('index.html', leads=leads)
     except Exception as e:
-        return f"שגיאה בטעינת הדף: {e}"
+        return f"Error: {e}"
 
-# כתובת לקבלת לידים חדשים
 @app.route('/webhook', methods=['POST'])
 def receive_lead():
     data = request.json
     if not data:
-        return "No data received", 400
+        return "No data", 400
+    
+    name = data.get('name', 'Unknown')
+    phone = data.get('phone', 'Unknown')
+    
     conn = sqlite3.connect('leads.db')
     cursor = conn.cursor()
-    cursor.execute('INSERT INTO leads (name, phone) VALUES (?, ?)', (data.get('name'), data.get('phone')))
+    cursor.execute('INSERT INTO leads (name, phone) VALUES (?, ?)', (name, phone))
     conn.commit()
     conn.close()
     return "OK", 200
 
 if __name__ == '__main__':
-    init_db()
-    app.run(host='0.0.0.0', port=5000)
+    # הגדרת פורט דינמי עבור Render
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)
